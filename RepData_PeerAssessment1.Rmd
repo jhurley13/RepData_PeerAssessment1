@@ -1,0 +1,109 @@
+---
+title: "RepData_PeerAssessment1"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(data.table)
+library(ggplot2)
+```
+
+### 1. Code for reading in the dataset and/or processing the data
+
+```{r}
+data <- as.data.table(read.csv("activity.csv", header = TRUE, sep = ","))
+
+# Add a column with the "date" column converted to a POSIXlt object
+data[, pdate := as.POSIXct(date, tz = "", format = "%Y-%m-%d"), by = interval]
+```
+
+### 2. Histogram of the total number of steps taken each day
+
+```{r}
+steps_by_day <- copy(data[,c("steps", "date")])
+setkey(steps_by_day, date)
+steps_by_day_t <- steps_by_day[, .(total = sum(steps, na.rm = TRUE)), by = date]
+
+hist(steps_by_day_t$total, xlab = "Steps per day", probability = FALSE, breaks = 20, main = "Histogram of Steps per Day")
+
+```
+
+### 3. Mean and median number of steps taken each day
+
+Total number of steps taken per day:  
+Mean  : `r mean(steps_by_day_t$total)`  
+Median: `r median(steps_by_day_t$total)`
+
+### 4. Time series plot of the average number of steps taken
+
+```{r}
+steps_by_interval <- data[, .(mean_steps = mean(steps, na.rm = TRUE)), by = interval]
+plot(steps_by_interval$interval, steps_by_interval$mean_steps, type="l")
+```
+
+### 5. The 5-minute interval that, on average, contains the maximum number of steps
+
+```{r}
+max_interval <- unique(steps_by_interval[mean_steps==max(steps_by_interval$mean_steps)]$interval)
+```
+
+Interval with maximum average number of steps: `r max_interval` (`r (max_interval %% 60)/5`:`r floor(max_interval / 60)`)
+
+### 6. Code to describe and show a strategy for imputing missing data
+
+TBD
+
+### 7. Histogram of the total number of steps taken each day after missing values are imputed
+
+TBD
+
+### 8. Panel plot comparing the average number of steps taken per 5-minute interval across weekdays and weekends
+
+```{r chunk8}
+is_weekend_day <- function(xdatetime) {
+    as.factor(weekdays(xdatetime)) %in% c("Saturday", "Sunday")
+}
+
+data[, weekend := is_weekend_day(pdate)]
+
+steps_by_interval_weekend <- data[data$weekend, .(mean_steps = mean(steps, na.rm = TRUE)), by = interval]
+steps_by_interval_weekday <- data[!data$weekend, .(mean_steps = mean(steps, na.rm = TRUE)), by = interval]
+
+library(ggpubr)
+library(magrittr)
+
+max_y_value <- max(max(steps_by_interval_weekend$mean_steps), max(steps_by_interval_weekday$mean_steps))
+
+weekend_plot <- 
+    ggplot(steps_by_interval_weekend, aes(interval, mean_steps)) + geom_line() +
+    xlab("") + ylab("") + ggtitle("Weekend") +
+    coord_cartesian(ylim = c(0, max_y_value)) +
+    theme(axis.title.x=element_blank(),
+          axis.text.x=element_blank(),
+          axis.ticks.x=element_blank(),
+          plot.title = element_text(hjust = 0.5))
+
+weekday_plot <- 
+    ggplot(steps_by_interval_weekday, aes(interval, mean_steps)) + geom_line() +
+    xlab("Interval") + ylab("") + ggtitle("Weekday") +
+    coord_cartesian(ylim = c(0, max_y_value)) +
+    theme(plot.title = element_text(hjust = 0.5))
+
+panel_plot <- ggarrange(weekend_plot, weekday_plot, ncol = 1, nrow = 2)
+panel_plot <- annotate_figure(panel_plot,
+                left = text_grob("Number of Steps", color = "black", rot = 90)
+)
+show(panel_plot)
+```
+
+There are a few quick observations that can be made from the panel plot:
+
+- The person is active earlier in the morning during the week
+- The activity level is generally lower during the day on weekdays
+
+
+
