@@ -28,7 +28,7 @@ steps_by_day_t <- steps_by_day[, .(total = sum(steps, na.rm = TRUE)), by = date]
 
 hist(steps_by_day_t$total, xlab = "Steps per day", probability = FALSE, breaks = 20, main = "Histogram of Steps per Day")
 
-print(paste0("total number of steps taken per day: Mean: ", mean(steps_by_day_t$total), ", Median: ", median(steps_by_day_t$total)))
+print(paste0("total number of steps taken per day: Mean: ", mean(steps_by_day_t$total, na.rm = TRUE), ", Median: ", median(steps_by_day_t$total, na.rm = TRUE)))
 
 # What is the average daily activity pattern?
 #     
@@ -61,6 +61,54 @@ print(paste0("Interval with maximum average number of steps: ", max_interval, " 
 # estimates from the first part of the assignment? What is the impact of
 # imputing missing data on the estimates of the total daily number of steps?
 
+print(paste0("The number of rows with a missing value is ", nrow(data[!complete.cases(data)])))
+print('Note that the only column with NAs is the steps column')
+
+print(sum(as.integer(is.na(data$steps))))
+
+# get_mean_for_day <- function(xdate) {
+#     intervals_per_day <- 288
+#     print(xdate)
+#     print(steps_by_day_t$date == xdate)
+#     (steps_by_day_t[steps_by_day_t$date == xdate]$total / intervals_per_day)
+# }
+
+imputed_data <- copy(data)
+imputed_data[, meanv := get_mean_for_interval(interval)]
+# imputed_data[, meand := get_mean_for_day(date)]
+
+imputed_data$steps[is.na(imputed_data$steps)] <-
+    imputed_data$meanv[is.na(imputed_data$steps)]
+
+i_steps_by_interval <- imputed_data[, .(mean_steps = mean(steps, na.rm = TRUE)), by = interval]
+
+get_mean_for_interval <- function(interval) {
+    i_steps_by_interval[i_steps_by_interval$interval == interval]$mean_steps
+}
+
+## Calculate mean & median for imputed values
+
+i_steps_by_day <- copy(imputed_data[, c("steps", "date")])
+setkey(i_steps_by_day, date)
+i_steps_by_day_t <-
+    i_steps_by_day[, .(total = sum(steps)), by = date]
+
+hist(
+    i_steps_by_day_t$total,
+    xlab = "Steps per day",
+    probability = FALSE,
+    breaks = 20,
+    main = "Histogram of Steps per Day (with imputed)"
+)
+
+print(
+    paste0(
+        "total number of steps taken per day (with imputed): Mean: ",
+        mean(i_steps_by_day_t$total),
+        ", Median: ",
+        median(i_steps_by_day_t$total)
+    )
+)
 
 # Are there differences in activity patterns between weekdays and weekends?
 #
@@ -79,10 +127,10 @@ is_weekend_day <- function(xdatetime) {
     as.factor(weekdays(xdatetime)) %in% c("Saturday", "Sunday")
 }
 
-data[, weekend := is_weekend_day(pdate)]
+imputed_data[, weekend := is_weekend_day(pdate)]
 
-steps_by_interval_weekend <- data[data$weekend, .(mean_steps = mean(steps, na.rm = TRUE)), by = interval]
-steps_by_interval_weekday <- data[!data$weekend, .(mean_steps = mean(steps, na.rm = TRUE)), by = interval]
+steps_by_interval_weekend <- imputed_data[imputed_data$weekend, .(mean_steps = mean(steps, na.rm = TRUE)), by = interval]
+steps_by_interval_weekday <- imputed_data[!imputed_data$weekend, .(mean_steps = mean(steps, na.rm = TRUE)), by = interval]
 
 library(ggpubr)
 
